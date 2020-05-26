@@ -11,11 +11,9 @@ def log_error_msg(func):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         try:
-            data = func()
-            logger.info(data)
-            return data
+            return func()
         except Exception as e:
             logger.exception(e)
-            return '程序出错,错误信息已记录日志'
+            return '程序执行出错,错误信息已在记录日志'
     return warp
 
