@@ -294,7 +294,12 @@ class AutoSign(object):
     def upload_img(self):
         """上传图片"""
         # 从图片文件夹内随机选择一张图片
-        all_img = os.listdir(IMAGE_PATH)
+        try:
+            all_img = os.listdir(IMAGE_PATH)
+        except Exception as e:
+            os.mkdir(IMAGE_PATH)
+            all_img = 0
+
         if len(all_img) == 0:
             return "a5d588f7bce1994323c348982332e470"
         else:
