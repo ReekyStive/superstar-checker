@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 requests.packages.urllib3.disable_warnings()
 from config import *
 from db_handler import *
-from sign_in_script import *
+from sign_script import *
 
 
 class AutoSign(object):
@@ -78,9 +78,9 @@ class AutoSign(object):
         data = json.loads(r.text)
         if data['result']:
             print("登录成功")
-            return 1000 # 登录成功
+            return 1000  # 登录成功
         else:
-            return 1001 # 登录信息有误
+            return 1001  # 登录信息有误
 
     def check_activeid(self, activeid: str):
         """验证当前活动id是否已存在"""
@@ -113,7 +113,8 @@ class AutoSign(object):
 
     def get_sign_type(self, classid, courseid, activeid):
         """获取签到类型"""
-        sign_url = 'https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/preSign?activeId={}&classId={}&courseId={}'.format(activeid, classid, courseid)
+        sign_url = 'https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/preSign?activeId={}&classId={}&courseId={}'.format(
+            activeid, classid, courseid)
         response = self.session.get(sign_url, headers=self.headers)
         h = etree.HTML(response.text)
         sign_type = h.xpath('//div[@class="location"]/span/text()')
@@ -136,7 +137,6 @@ class AutoSign(object):
             res.append((activeid[0], sign_type[0]))
 
         n = len(res)
-        print(res, n)
         if n != 0:
             d = {'num': n, 'class': {}}
             for i in range(n):
@@ -154,7 +154,6 @@ class AutoSign(object):
     def sign_in_type_judgment(self, classid, courseid, activeid, sign_type):
         """签到类型的逻辑判断"""
         s = Sign(self.session, classid, courseid, activeid, sign_type)
-        print(sign_type)
         if "手势" in sign_type:
             return s.hand_sign()
         elif "二维码" in sign_type:
@@ -228,8 +227,6 @@ def server_chan_send(msgs, sckey=None):
     }
     if sckey:
         requests.get('https://sc.ftqq.com/{}.send'.format(sckey), params=params)
-    else:
-        requests.get(SERVER_CHAN['url'], params=params)
 
 
 def interface(user_info, sckey):
@@ -246,8 +243,8 @@ def interface(user_info, sckey):
         result = s.sign_tasks_run()
         detail = result['detail']
         if result['msg'] == 2001:
-            if SERVER_CHAN['status']:
-                server_chan_send(detail, sckey)
+            server_chan_send(detail, sckey)
+        print('执行完毕')
         return result
 
     except Exception as e:
