@@ -59,7 +59,7 @@ class AutoSign(object):
         self.session.cookies = cookies_jar
         # 验证cookies
         r = self.session.get(
-            'http://i.mooc.chaoxing.com/app/myapps.shtml',
+            'http://mooc1-1.chaoxing.com/api/workTestPendingNew',
             allow_redirects=False)
         if r.status_code != 200:
             print("cookies已失效")
