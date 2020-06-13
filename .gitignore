@@ -21,10 +21,14 @@ config1.py
 将删除 .idea/modules.xml
 将删除 .idea/vcs.xml
 将删除 .idea/workspace.xml
-!/.idea/
+!/.idea/*.iml
 将删除 local/activeid.json
 将删除 local/logs.log
 将删除 .idea/deployment.xml
 将删除 .idea/dictionaries/
 将删除 .idea/sshConfigs.xml
 将删除 .idea/webServers.xml
+!/.idea/codeStyles/
+!/.idea/inspectionProfiles/
+!/.idea/dictionaries/
+!/.idea/chaoxing_auto_sign.iml
