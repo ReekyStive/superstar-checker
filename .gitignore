@@ -21,3 +21,6 @@ config1.py
 将删除 .idea/modules.xml
 将删除 .idea/vcs.xml
 将删除 .idea/workspace.xml
+!/.idea/
+将删除 local/activeid.json
+将删除 local/logs.log
