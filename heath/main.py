@@ -50,7 +50,6 @@ class HeathReport(object):
     def _get_last_heath_info(self):
         """
         获取上次提交的健康信息
-
         """
         params = {
             "cpage": "1",
@@ -65,6 +64,9 @@ class HeathReport(object):
 
     @staticmethod
     def clean_heath_info(raw_data: dict) -> list:
+        """
+        清理无用信息
+        """
         form_data = raw_data['data']['formUserList'][0]['formData']
         d = {
             "inDetailGroupIndex": -1,
@@ -133,13 +135,26 @@ class HeathReport(object):
     def daily_report(self):
         """
         每日健康信息上报
-        今天没打卡机会了，明天测试
-        估计与修改上报信息相差不大
         """
-        pass
+        self._to_begin()
+        save_api = "http://office.chaoxing.com/data/apps/forms/fore/user/save?lookuid=127973522"
+        data = {
+            "formId": "7185",
+            "formAppId": "",
+            "version": "2",
+            "checkCode": "",
+            "enc": "f837c93e0de9d9ad82db707b2c27241e",
+            "formData": ""
+        }
+        payload = parse.urlencode(data)
+        str_form_data = str(self.form_data)
+        str_form_data = str_form_data.replace('\'', '\"').replace('False', 'false').replace('True', 'true').replace(
+            r"\\", "\\")
+        payload += quote(str_form_data, 'utf-8')
+        resp = self._session.post(save_api, data=payload)
+        print(resp.text)
 
 
 if __name__ == '__main__':
     h = HeathReport(username=USER_INFO['username'], password=USER_INFO['password'])
-    h.edit_report(hid="#########", enc="########")
-
+    h.daily_report()
