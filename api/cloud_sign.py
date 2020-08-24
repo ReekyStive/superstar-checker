@@ -1,146 +1,221 @@
 # -*- coding: utf8 -*-
-import re
 import json
+import re
 import asyncio
-import logging
-import requests
 import traceback
+import logging
+from typing import Optional, List, Dict
+from aiohttp import ClientSession
 from lxml import etree
 from bs4 import BeautifulSoup
-requests.packages.urllib3.disable_warnings()
-from config import *
-from db_handler import *
-from sign_script import *
+from config import STATUS_CODE_DICT
+from db_handler import SignMongoDB
+from sign_script import Sign
+
+HEADERS = {
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'zh-CN,zh;q=0.9',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.100 Safari/537.36'
+}
 
 
 class AutoSign(object):
 
-    def __init__(self, username, password, schoolid=None):
-        """初始化就进行登录"""
-        self.headers = {
-            'Accept-Encoding': 'gzip, deflate',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.100 Safari/537.36'}
-        self.session = requests.session()
-        self.session.headers = self.headers
+    def __init__(self, session: ClientSession, username: str, password: str, schoolid: str = None):
+        """初始化就进行登录
+        @param session:
+        @param username: 用户[学号]
+        @param password: 密码
+        @param schoolid: 学校ID[仅学号登录填写]
+        """
+        self.session = session
         self.username = username
         self.password = password
         self.schoolid = schoolid
         self.mongo = SignMongoDB(username)
 
-    def set_cookies(self):
-        """设置cookies"""
-        if not self.check_cookies():
+    async def is_new_user(self) -> None:
+        """
+        判断是否为新用户
+        @return:
+        """
+        if not await self.mongo.find_old_user():
+            await self.mongo.create_new_user()
+
+    async def set_cookies(self) -> int:
+        """设置cookies
+        @return:
+        """
+        code: int = 1000  # 登录信息有误
+        if not await self.check_cookies():
             # 无效则重新登录，并保存cookies
-            login_status = self.login()
-            if login_status == 1000:
-                self.save_cookies()
-            else:
-                return 1001
-        return 1000
+            login_status: dict = await self.login()
+            # 1000 有效， 1001 无效
+            code = login_status['code']
+            if code == 1000:
+                await self.save_cookies(login_status['cookies'])
+        return code
 
-    def save_cookies(self):
+    async def save_cookies(self, cookies: dict):
         """保存cookies"""
-        new_cookies = self.session.cookies.get_dict()
-        self.mongo.to_save_cookie(new_cookies)
+        await self.mongo.save_cookie(cookies)
 
-    def check_cookies(self):
-        """验证cookies"""
+    async def check_cookies(self) -> bool:
+        """
+        验证cookies
+        @return:
+        """
         # 从数据库内取出cookie
-        try:
-            cookies = self.mongo.to_get_cookie()
-        except:
-            return False
+        status: bool = False
+        cookies = await self.mongo.get_cookie()
 
-        # session设置cookies
-        cookies_jar = requests.utils.cookiejar_from_dict(cookies)
+        if not cookies:
+            return status
 
-        self.session.cookies = cookies_jar
+        self.session.cookie_jar.update_cookies(cookies)
+
         # 验证cookies
-        r = self.session.get(
-            'http://mooc1-1.chaoxing.com/api/workTestPendingNew',
-            allow_redirects=False)
-        if r.status_code != 200:
-            print("cookies已失效")
-            return False
-        else:
-            print("cookies有效哦")
-            return True
+        async with self.session.get('http://mooc1-1.chaoxing.com', allow_redirects=False) as resp:
+            if resp.status != 200:
+                print("cookies已失效")
+                status = False
+            else:
+                print("cookies有效")
+                status = True
+        return status
 
-    def login(self):
+    async def login(self) -> dict:
         # 登录-手机邮箱登录
-        r = self.session.get(
-            'https://passport2.chaoxing.com/api/login?name={}&pwd={}&schoolid={}&verify=0'.format(
-                self.username, self.password, self.schoolid if self.schoolid else ""), headers=self.headers)
-        if r.status_code == 403:
-            return 1002
-        data = json.loads(r.text)
-        if data['result']:
-            print("登录成功")
-            return 1000  # 登录成功
-        else:
-            return 1001  # 登录信息有误
+        url = 'https://passport2.chaoxing.com/api/login?name={}&pwd={}&schoolid={}&verify=0'.format(self.username,
+                                                                                                    self.password,
+                                                                                                    self.schoolid if self.schoolid else "")
+        code: int
+        cookies: dict = {}
+        async with self.session.get(url) as resp:
+            if resp.status == 403:
+                code = 1002
+                return {
+                    'code': code,
+                    'cookies': cookies
+                }
+            data = json.loads(await resp.read())
+            if data['result']:
+                # return 1000  # 登录成功
+                code = 1000
+                cookies = resp.cookies
+            else:
+                # 登录信息有误
+                code = 1001
+            return {
+                'code': code,
+                'cookies': cookies
+            }
 
-    def check_activeid(self, activeid: str):
-        """验证当前活动id是否已存在"""
-        activeid_lists = self.mongo.to_get_istext_activeid()
+    async def check_activeid(self, activeid: str) -> bool:
+        """
+        用于判断当前签到是否已被执行
+        @param activeid: 活动id，用于判断当前签到是否已被执行
+        @return:
+        """
+        activeid_lists: list = await self.mongo.get_text_activeid()
         if activeid in activeid_lists:
             return True
         else:
             return False
 
-    def get_all_classid(self) -> list:
-        """获取课程主页中所有课程的classid和courseid"""
-        res = []
-        # 首先去数据库里寻找
-        res = self.mongo.to_get_all_classid_and_courseid()
-        if not res:
-            r = self.session.get(
-                'http://mooc1-2.chaoxing.com/visit/interaction',
-                headers=self.headers)
-            soup = BeautifulSoup(r.text, "lxml")
-            courseId_list = soup.find_all('input', attrs={'name': 'courseId'})
-            classId_list = soup.find_all('input', attrs={'name': 'classId'})
-            classname_list = soup.find_all('h3', class_="clearfix")
+    @staticmethod
+    def class_info(res: List[Dict], soup: BeautifulSoup) -> List[Dict]:
+        """
+        整理课程信息courseid， classid， classname
+        @param res:
+        @param soup:
+        @return:
+        """
+        course_id_list = soup.find_all('input', attrs={'name': 'courseId'})
+        class_id_list = soup.find_all('input', attrs={'name': 'classId'})
+        classname_list = soup.find_all('h3', class_="clearfix")
 
-            # 用户首次使用，可以将所用有的classid保存
-            for i, v in enumerate(courseId_list):
-                res.append((v['value'], classId_list[i]['value'],
-                            classname_list[i].find_next('a').text))
-            self.mongo.to_save_all_classid_and_courseid(res)
+        # 用户首次使用，将所用有的classid保存
+        for i, v in enumerate(course_id_list):
+            res.append({
+                'classid': class_id_list[i]['value'],
+                'courseid': v['value'],
+                'classname': classname_list[i].find_next('a').text
+            })
+            # res.append((v['value'], class_id_list[i]['value'],
+            #             classname_list[i].find_next('a').text))
         return res
 
-    def get_sign_type(self, classid, courseid, activeid):
-        """获取签到类型"""
+    async def get_all_classid(self) -> List[Dict]:
+        """
+        获取课程主页中所有课程的classid和courseid
+        """
+        res: List[Dict] = await self.mongo.get_all_classid_and_courseid()
+        # 数据库查找，没有则新获取
+        if not res:
+            async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction') as resp:
+                soup = BeautifulSoup(await resp.read(), "lxml")
+
+            res = self.class_info(res, soup)
+            await self.mongo.save_all_classid_and_courseid(res)
+        return res
+
+    async def update_courseid(self) -> dict:
+        """
+        更新用户课程ID
+        @return:
+        """
+        res: List[Dict] = []
+        async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction') as resp:
+            soup = BeautifulSoup(await resp.read(), "lxml")
+
+        res = self.class_info(res, soup)
+        await self.mongo.update_courseid(res)
+        return {
+            'code': 3006,
+            'message': STATUS_CODE_DICT[3006]
+        }
+
+    async def get_sign_type(self, classid: str, courseid: str, activeid: str) -> str:
+        """
+        获取签到类型
+        """
         sign_url = 'https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/preSign?activeId={}&classId={}&courseId={}'.format(
             activeid, classid, courseid)
-        response = self.session.get(sign_url, headers=self.headers)
-        h = etree.HTML(response.text)
-        sign_type = h.xpath('//div[@class="location"]/span/text()')
-        return sign_type
+        async with self.session.get(sign_url) as resp:
+            h = etree.HTML(await resp.read())
+        sign_type: list = h.xpath('//div[@class="location"]/span/text()')
+        return sign_type[0]
 
-    async def get_activeid(self, classid, courseid, classname):
-        """访问任务面板获取课程的活动id"""
+    async def get_activeid(self, classid: str, courseid: str, classname: str) -> Optional[Dict]:
+        """
+        访问任务面板获取课程的活动id
+        """
+
+        res: list = []
         re_rule = r'([\d]+),2'
-        r = self.session.get(
-            'https://mobilelearn.chaoxing.com/widget/pcpick/stu/index?courseId={}&jclassId={}'.format(
-                courseid, classid), headers=self.headers, verify=False)
-        res = []
-        h = etree.HTML(r.text)
+        url: str = 'https://mobilelearn.chaoxing.com/widget/pcpick/stu/index?courseId={}&jclassId={}'.format(
+            courseid, classid)
+        async with self.session.get(url) as resp:
+            h = etree.HTML(await resp.read())
+
         activeid_list = h.xpath('//*[@id="startList"]/div/div/@onclick')
+
         for activeid in activeid_list:
             activeid = re.findall(re_rule, activeid)
             if not activeid:
                 continue
-            sign_type = self.get_sign_type(classid, courseid, activeid[0])
-            res.append((activeid[0], sign_type[0]))
+            sign_type: str = await self.get_sign_type(classid, courseid, activeid[0])
+            res.append((activeid[0], sign_type))
 
-        n = len(res)
-        if n != 0:
-            d = {'num': n, 'class': {}}
-            for i in range(n):
-                if self.check_activeid(res[i][0]):
+        count = len(res)
+        if count != 0:
+            # d['count'] 此次签到有几门课程
+            # d['class'] 此次签到所有课程的信息
+            d = {'count': count, 'class': {}}
+            for i in range(count):
+                if await self.check_activeid(res[i][0]):
                     continue
                 d['class'][i] = {
                     'classid': classid,
@@ -151,103 +226,138 @@ class AutoSign(object):
                 }
             return d
 
-    def sign_in_type_judgment(self, classid, courseid, activeid, sign_type):
-        """签到类型的逻辑判断"""
-        s = Sign(self.session, classid, courseid, activeid, sign_type)
-        if "手势" in sign_type:
-            return s.hand_sign()
-        elif "二维码" in sign_type:
-            return s.qcode_sign()
-        elif "位置" in sign_type:
-            return s.addr_sign()
-        elif "拍照" in sign_type:
-            return s.tphoto_sign()
-        else:
-            return s.general_sign()
+    async def sign_in_type_judgment(self, classid: str, courseid: str, activeid: str, sign_type: str) -> dict:
+        """
+        判断签到类型
+        """
+        res: dict
+        sign = Sign(self.session, classid, courseid, activeid, sign_type)
 
-    def sign_tasks_run(self):
+        if "手势" in sign_type:
+            res = await sign.hand_sign()
+
+        elif "二维码" in sign_type:
+            res = await sign.qcode_sign()
+
+        elif "位置" in sign_type:
+            res = await sign.addr_sign()
+
+        elif "拍照" in sign_type:
+            res = await sign.tphoto_sign()
+
+        else:
+            res = await sign.general_sign()
+
+        return res
+
+    async def sign_tasks_run(self) -> dict:
         """开始所有签到任务"""
-        tasks = []
-        res = []
+        tasks: list = []
+        message: str = ''
+        signed_list: List[Dict] = []
+
         # 获取所有课程的classid和course_id
-        classid_courseId = self.get_all_classid()
+        class_infos: List[Dict] = await self.get_all_classid()
 
         # 使用协程获取所有课程activeid和签到类型
-        for i in classid_courseId:
-            coroutine = self.get_activeid(i[1], i[0], i[2])
+        for info in class_infos:
+            coroutine = self.get_activeid(classid=info['classid'],
+                                          courseid=info['courseid'],
+                                          classname=info['classname'])
             tasks.append(coroutine)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(asyncio.gather(*tasks))
-        loop.close()
-        print(result)
+
+        result: List[Optional[Dict]] = await asyncio.gather(*tasks)
+        # print('执行结果->', result)
         for r in result:
-            if r:
-                for d in r['class'].values():
-                    s = self.sign_in_type_judgment(
-                        d['classid'],
-                        d['courseid'],
-                        d['activeid'],
-                        d['sign_type'])
+            if not r:
+                continue
+            for d in r['class'].values():
+                sign_res: dict = await self.sign_in_type_judgment(
+                    d['classid'],
+                    d['courseid'],
+                    d['activeid'],
+                    d['sign_type'])
 
-                    # 签到课程， 签到时间， 签到状态
-                    sign_msg = {
-                        'name': d['classname'],
-                        'date': s['date'],
-                        'status': STATUS_CODE_DICT[s['status']]
-                    }
-                    # 将签到成功activeid保存至数据库
-                    self.mongo.to_save_istext_activeid(d['activeid'])
-                    res.append(sign_msg)
-        if res:
-            final_msg = {
-                'msg': 2001,
-                'detail': res,
-            }
+                # 签到课程， 签到时间， 签到状态
+                sign_msg = {
+                    'name': d['classname'],
+                    'date': sign_res['date'],
+                    'status': STATUS_CODE_DICT[sign_res['status']]
+                }
+                # 将签到成功activeid保存至数据库
+                await self.mongo.save_text_activeid(d['activeid'])
+                signed_list.append(sign_msg)
+        if signed_list:
+            code = 2001
+            # message: str = ''
         else:
-            final_msg = {
-                'msg': 2000,
-                'detail': STATUS_CODE_DICT[2000]
-            }
-        return final_msg
+            code = 2000
+            message = STATUS_CODE_DICT[2000]
+        return {
+            'code': code,
+            'signed_list': signed_list,
+            'message': message
+        }
 
 
-def server_chan_send(msgs, sckey=None):
-    """server酱将消息推送至微信"""
-    desp = ''
-    for msg in msgs:
-        desp = '|  **课程名**  |   {}   |\r\r| :----------: | :---------- |\r\r'.format(
-            msg['name'])
-        desp += '| **签到时间** |   {}   |\r\r'.format(msg['date'])
-        desp += '| **签到状态** |   {}   |\r\r'.format(msg['status'])
+# def server_chan_send(msgs, sckey=None):
+#     """server酱将消息推送至微信"""
+#     desp = ''
+#     for msg in msgs:
+#         desp = '|  **课程名**  |   {}   |\r\r| :----------: | :---------- |\r\r'.format(
+#             msg['name'])
+#         desp += '| **签到时间** |   {}   |\r\r'.format(msg['date'])
+#         desp += '| **签到状态** |   {}   |\r\r'.format(msg['status'])
+#
+#     params = {
+#         'text': '您的网课签到消息来啦！',
+#         'desp': desp
+#     }
+#     # if sckey:
+#     #     requests.get('https://sc.ftqq.com/{}.send'.format(sckey), params=params)
+# async def update_courseid(username: str, password)
 
-    params = {
-        'text': '您的网课签到消息来啦！',
-        'desp': desp
-    }
-    if sckey:
-        requests.get('https://sc.ftqq.com/{}.send'.format(sckey), params=params)
+async def run(
+        username: str,
+        password: str,
+        schoolId: Optional[str] = None,
+        sckey: Optional[str] = None,
+        task_type: Optional[str] = 'sign'
+) -> dict:
+    """
+    脚本入口
+    @param username:
+    @param password:
+    @param schoolId:
+    @param sckey:
+    @param task_type: 任务类型： sign签到; update更新
+    @return:
+    """
+    async with ClientSession(headers=HEADERS) as session:
+        try:
+            result: dict
+            auto_sign = AutoSign(session, username, password, schoolId)
+            await auto_sign.is_new_user()
+            login_status = await auto_sign.set_cookies()
 
+            if login_status != 1000:
+                return {
+                    'msg': login_status,
+                    'message': '登录失败，' + STATUS_CODE_DICT[login_status]
+                }
+            if task_type == 'sign':
+                result = await auto_sign.sign_tasks_run()
+            elif task_type == 'update':
+                result = await auto_sign.update_courseid()
+            elif task_type == 'bind':
+                pass
+            # message = result['message']
+            # if result['msg'] == 2001:
+            #     server_chan_send(detail, sckey)
+            print('执行完毕')
+            return result
 
-def interface(user_info, sckey):
-    try:
-        s = AutoSign(user_info['username'], user_info['password'], user_info['schoolid'])
-        login_status = s.set_cookies()
-        print(login_status)
-        if login_status != 1000:
-            return {
-                'msg': login_status,
-                'detail': '登录失败，' + STATUS_CODE_DICT[login_status]
-            }
-
-        result = s.sign_tasks_run()
-        detail = result['detail']
-        if result['msg'] == 2001:
-            server_chan_send(detail, sckey)
-        print('执行完毕')
-        return result
-
-    except Exception as e:
-        logging.basicConfig(filename='logs.log', format='%(asctime)s %(message)s', level=logging.DEBUG)
-        logging.error(traceback.format_exc())
-        return {'msg': 4000, 'detail': STATUS_CODE_DICT[4000]}
+        except Exception:
+            logging.basicConfig(filename='logs.log', format='%(asctime)s %(message)s', level=logging.DEBUG)
+            logging.error(traceback.format_exc())
+            return {'msg': 4000, 'message': STATUS_CODE_DICT[4000]}

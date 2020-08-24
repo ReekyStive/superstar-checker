@@ -2,13 +2,15 @@
 
 - 登录方式：
 
-支持手机号码登录，支持学号登录
+支持手机号码登录和学号登录
 
 - 签到功能：
 
 健康打卡：
 
-2020-08-23 正在开发中...
+支持腾讯云函数，设置定时触发自动打卡
+
+详情： https://github.com/mkdir700/chaoxing_auto_sign/tree/latest/heath
 
 课程签到：
 
@@ -29,18 +31,28 @@
 ## 项目目录
 
 ```
-├── api
+├── api                         # 课堂签到（API）
 │   ├── cloud_sign.py
 │   ├── config.py
 │   ├── db_handler.py
 │   ├── main.py
+│   ├── readme.md
 │   ├── requirements.txt
-│   └── sign_in_script.py
-├── local
-│   ├── cloud_sign.py
+│   └── sign_script.py
+├── heath                       # 健康日报
+│   ├── main.py
+│   └── readme.md
+├── local                       # 课程签到（本地）
 │   ├── config.py
+│   ├── image
+│   │   └── 深度截图_选择区域_20200522103426.png
+│   ├── local_sign.py
+│   ├── log.py
+│   ├── logs.log
 │   └── requirements.txt
-└── readme.md
+├── __pycache__
+├── readme.md
+└── start.sh
 ```
 
 - 多人使用：
