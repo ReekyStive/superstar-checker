@@ -42,10 +42,14 @@ class SignMongoDB(object):
     async def get_all_classid_and_courseid(self) -> List[Dict]:
         """获取此用户所有的课程id"""
         cursor = await self.collection.find_one({"username": self.username}, {"cclist": 1.0})
+        result = []
         try:
-            return cursor['cclist']
+            result = cursor['cclist']
+        except KeyError:
+            pass
         except TypeError:
-            return []
+            pass
+        return result
 
     async def save_all_classid_and_courseid(self, cclists: List[Dict]):
         """
