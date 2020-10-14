@@ -1,6 +1,6 @@
 # -*- coding: utf8 -*-
-import json
 import re
+import json
 import asyncio
 import traceback
 import logging
@@ -152,6 +152,12 @@ class AutoSign(object):
         获取课程主页中所有课程的classid和courseid
         """
         res: List[Dict] = await self.mongo.get_all_classid_and_courseid()
+        # 之前的存储为List[List]
+        if res and isinstance(res[0], list):
+            # 将之前的存储格式更新为List[Dict]
+            await self.update_courseid()
+            res: List[Dict] = await self.mongo.get_all_classid_and_courseid()
+
         # 数据库查找，没有则新获取
         if not res:
             async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction') as resp:
@@ -318,6 +324,7 @@ class AutoSign(object):
 # async def update_courseid(username: str, password)
 
 async def run(
+        session: ClientSession,
         username: str,
         password: str,
         schoolId: Optional[str] = None,
@@ -326,6 +333,7 @@ async def run(
 ) -> dict:
     """
     脚本入口
+    @param session:
     @param username:
     @param password:
     @param schoolId:
@@ -333,31 +341,32 @@ async def run(
     @param task_type: 任务类型： sign签到; update更新
     @return:
     """
-    async with ClientSession(headers=HEADERS) as session:
-        try:
-            result: dict
-            auto_sign = AutoSign(session, username, password, schoolId)
-            await auto_sign.is_new_user()
-            login_status = await auto_sign.set_cookies()
+    result: dict = {}
+    try:
+        auto_sign = AutoSign(session, username, password, schoolId)
+        await auto_sign.is_new_user()
+        login_status = await auto_sign.set_cookies()
 
-            if login_status != 1000:
-                return {
-                    'msg': login_status,
-                    'message': '登录失败，' + STATUS_CODE_DICT[login_status]
-                }
-            if task_type == 'sign':
-                result = await auto_sign.sign_tasks_run()
-            elif task_type == 'update':
-                result = await auto_sign.update_courseid()
-            elif task_type == 'bind':
-                pass
-            # message = result['message']
-            # if result['msg'] == 2001:
-            #     server_chan_send(detail, sckey)
-            print('执行完毕')
-            return result
+        if login_status != 1000:
+            return {
+                'msg': login_status,
+                'message': '登录失败，' + STATUS_CODE_DICT[login_status]
+            }
+        if task_type == 'sign':
+            result = await auto_sign.sign_tasks_run()
+        elif task_type == 'update':
+            result = await auto_sign.update_courseid()
+        elif task_type == 'bind':
+            result = {}
+        # message = result['message']
+        # if result['msg'] == 2001:
+        #     server_chan_send(detail, sckey)
+        # print('执行完毕')
+        # return result
 
-        except Exception:
-            logging.basicConfig(filename='logs.log', format='%(asctime)s %(message)s', level=logging.DEBUG)
-            logging.error(traceback.format_exc())
-            return {'msg': 4000, 'message': STATUS_CODE_DICT[4000]}
+    except Exception:
+        logging.basicConfig(filename='logs.log', format='%(asctime)s %(message)s', level=logging.DEBUG)
+        logging.error(traceback.format_exc())
+        result = {'msg': 4000, 'message': STATUS_CODE_DICT[4000]}
+    print(result)
+    return result

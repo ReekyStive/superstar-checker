@@ -6,7 +6,6 @@ from motor.motor_asyncio import core
 class SignMongoDB(object):
 
     def __init__(self, username: str):
-        # self.client = MongoClient("mongodb://localhost:27017/")
         self.client: core.AgnosticClient = motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
         database: core.AgnosticDatabase = self.client["signweb"]
         self.collection: core.AgnosticCollection = database["users"]
@@ -28,9 +27,13 @@ class SignMongoDB(object):
     async def get_cookie(self) -> dict:
         """从数据库内取出cookie"""
         try:
-            return await self.collection.find_one({"username": self.username}, {"cookie": 1.0})['cookie']
+            x = await self.collection.find_one({"username": self.username}, {"cookie": 1.0})
+            return x['cookie']
+        except KeyError:
+            pass
         except TypeError:
-            return {}
+            pass
+        return {}
 
     async def save_cookie(self, cookie: dict) -> None:
         """保存cookie到数据库"""
