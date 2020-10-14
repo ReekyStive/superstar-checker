@@ -1,3 +1,4 @@
+import asyncio
 import uvicorn
 from typing import Optional
 from fastapi import FastAPI
@@ -30,12 +31,15 @@ async def sign(username: str,
     @param sckey:
     @return:
     """
-    async with ClientSession(headers=HEADERS, connector=TCPConnector(limit=2, verify_ssl=False)) as session:
-        return await cloud_sign.run(session=session,
-                                    username=username,
-                                    password=password,
-                                    schoolId=schoolid,
-                                    sckey=sckey)
+    semaphore = asyncio.Semaphore(20)
+
+    async with semaphore:
+        async with ClientSession(headers=HEADERS, connector=TCPConnector(limit=2)) as session:
+            return await cloud_sign.run(session=session,
+                                        username=username,
+                                        password=password,
+                                        schoolId=schoolid,
+                                        sckey=sckey)
 
 
 @app.get('/updatecourseid')

@@ -49,7 +49,7 @@ class AutoSign(object):
         """
         code: int = 1000  # 登录信息有误
         if not await self.check_cookies():
-            # 无效则重新登录，并保存cookies
+            # 无效
             login_status: dict = await self.login()
             # 1000 有效， 1001 无效
             code = login_status['code']
@@ -68,7 +68,7 @@ class AutoSign(object):
         """
         # 从数据库内取出cookie
         status: bool = False
-        cookies = await self.mongo.get_cookie()
+        cookies: dict = await self.mongo.get_cookie()
 
         if not cookies:
             return status
@@ -78,11 +78,10 @@ class AutoSign(object):
         # 验证cookies
         async with self.session.get('http://mooc1-1.chaoxing.com', allow_redirects=False) as resp:
             if resp.status != 200:
-                print("cookies已失效")
-                status = False
-            else:
-                print("cookies有效")
+                # print("cookies有效")
                 status = True
+            # print("cookies已失效")
+
         return status
 
     async def login(self) -> dict:
@@ -99,7 +98,10 @@ class AutoSign(object):
                     'code': code,
                     'cookies': cookies
                 }
-            data = json.loads(await resp.read())
+            # resp.cookies
+            text = await resp.read()
+            print(text)
+            data = json.loads(text)
             if data['result']:
                 # return 1000  # 登录成功
                 code = 1000
