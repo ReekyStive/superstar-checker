@@ -1,3 +1,4 @@
+import re
 import json
 from urllib import parse
 from urllib.parse import quote
@@ -5,15 +6,15 @@ import requests
 
 # 配置学习通账号密码
 USER_INFO = {
-    'username': '',
-    'password': '',
+    'username': 'xxxxx',
+    'password': 'xxxxx',
     'schoolid': '',  # 学号登录才需要填写
 }
 
 
 class HeathReport(object):
 
-    def __init__(self, username: str = None, password: str = None, schoolid: str = None):
+    def __init__(self, username: str = "", password: str = "", schoolid: str = ""):
         """
         :params username: 手机号或学号
         :params password: 密码
@@ -43,6 +44,7 @@ class HeathReport(object):
             "schoolid": self._schoolid if self._schoolid else ""
         }
         resp = self._session.get(login_api, params=params)
+
         if resp.status_code == 403:
             return "403"
 
@@ -120,22 +122,47 @@ class HeathReport(object):
         resp = self._session.post(edit_api, data=payload)
         return json.loads(resp.text)
 
-    def _daily_report(self) -> dict:
+    def _daily_report(self, check_code) -> dict:
         """
         上报今日信息
         """
-        save_api = "http://office.chaoxing.com/data/apps/forms/fore/user/save?lookuid=127973522"
+        # save_api = "http://office.chaoxing.com/data/apps/forms/fore/user/save?lookuid=127973522"
+        save_api = "http://office.chaoxing.com/data/apps/forms/fore/user/save?lookuid=127973604"
         params = {
             "formId": "7185",
             "formAppId": "",
             "version": "2",
-            "checkCode": "",
+            "checkCode": check_code,
             "enc": "f837c93e0de9d9ad82db707b2c27241e",
             "formData": ""
         }
         payload = self.form_data_to_urlencoded(params)
         resp = self._session.post(save_api, data=payload)
         return json.loads(resp.text)
+
+    def _request_form_page(self):
+        """
+        请求表单页面
+        @return:
+        @rtype:
+        """
+        form_url = "http://office.chaoxing.com/front/web/apps/forms/fore/apply?uid=127973604&code=l5RJsW2w&mappId=4545821&appId=1e354ddb52a743e88ed19a3704b1cf1a&appKey=127G2jhIhl05mw3S&id=7185&enc=f837c93e0de9d9ad82db707b2c27241e&state=39037&formAppId=&fidEnc=b06cba4a51ac2253"
+        return self._session.get(url=form_url)
+
+    @staticmethod
+    def _get_check_code(resp):
+        """
+        解析表单界面获取checkCode
+        @param resp:
+        @type resp:
+        @return: checkCode
+        @rtype: str
+        """
+        code = re.findall(r"checkCode.*'(.*)'", resp.text)
+        if code:
+            return code[0]
+        else:
+            raise Exception("校验码获取失败")
 
     def _to_begin(self):
         """
@@ -147,7 +174,7 @@ class HeathReport(object):
 
     def edit_report(self, hid: str, enc: str) -> dict:
         """
-        修改已上报的健康信息入口
+        修改已上报的健康信息
         说明：修改已上报信息的功能实际意义不大，主要是开发时测试使用
         :params id: 表单id
         :params form_data: 已编码的上次健康信息
@@ -160,17 +187,27 @@ class HeathReport(object):
         健康信息上报入口
         """
         self._to_begin()
-        return self._daily_report()
+        r = self._request_form_page()
+        check_code = self._get_check_code(r)
+        return self._daily_report(check_code=check_code)
 
 
 def main_handler(event=None, context=None):
-    query: dict = event["queryString"]
-    username, password, schoolid = query.get("name", ''), query.get("pwd", ''), query.get("schoolid", "")
-    if not username or not password:
-        return {
-            "message": "账号密码不能为空"
-        }
+    if event is not None:
+        query: dict = event["queryString"]
+        username, password, schoolid = query.get("name", ''), query.get("pwd", ''), query.get("schoolid", "")
 
-    h = HeathReport(username=username, password=password, schoolid=schoolid)
+        if not username or not password:
+            return {
+                "message": "账号密码不能为空"
+            }
+
+        h = HeathReport(username=username, password=password, schoolid=schoolid)
+    else:
+        h = HeathReport(username=USER_INFO['username'], password=USER_INFO['password'], schoolid=USER_INFO['schoolid'])
     result = h.daily_report()
     return result
+
+
+if __name__ == '__main__':
+    print(main_handler())
