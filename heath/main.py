@@ -1,3 +1,4 @@
+# -*- coding: utf8 -*-
 import re
 import json
 from urllib import parse
@@ -46,11 +47,10 @@ class HeathReport(object):
         resp = self._session.get(login_api, params=params)
 
         if resp.status_code == 403:
-            return "403"
+            raise Exception("403，登录请求被拒绝")
 
         data = json.loads(resp.text)
-        print(data)
-        return json.loads(resp.text)
+        return data
 
     def _get_last_heath_info(self) -> dict:
         """
@@ -194,19 +194,18 @@ class HeathReport(object):
 
 def main_handler(event=None, context=None):
     if event is not None:
-        query: dict = event["queryString"]
-        username, password, schoolid = query.get("name", ''), query.get("pwd", ''), query.get("schoolid", "")
+        query: dict = event.get("queryString", "")
+        if query:
+            username, password, schoolid = query.get("name", ''), query.get("pwd", ''), query.get("schoolid", "")
 
-        if not username or not password:
-            return {
-                "message": "账号密码不能为空"
-            }
-
-        h = HeathReport(username=username, password=password, schoolid=schoolid)
-    else:
-        h = HeathReport(username=USER_INFO['username'], password=USER_INFO['password'], schoolid=USER_INFO['schoolid'])
-    result = h.daily_report()
-    return result
+            if not username or not password:
+                return {
+                    "message": "账号密码不能为空"
+                }
+            h = HeathReport(username=username, password=password, schoolid=schoolid)
+            return h.daily_report()
+    h = HeathReport(username=USER_INFO['username'], password=USER_INFO['password'], schoolid=USER_INFO['schoolid'])
+    return h.daily_report()
 
 
 if __name__ == '__main__':
