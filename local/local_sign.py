@@ -10,8 +10,8 @@ from lxml import etree
 from bs4 import BeautifulSoup
 from apscheduler.schedulers.blocking import BlockingScheduler
 requests.packages.urllib3.disable_warnings()
-from config import *
 from log import log_error_msg
+from config import *
 
 
 class AutoSign(object):
@@ -391,31 +391,32 @@ def server_chan_send(msgs):
 
 
 @log_error_msg
-def gen_run():
+def gen_run(username, password):
     """运行"""
-    s = AutoSign(USER_INFO['username'], USER_INFO['password'])
-    login_status = s.set_cookies()
+    auto_sign = AutoSign(username, password)
+    login_status = auto_sign.login()
     if login_status != 1000:
         return {
             'msg': login_status,
             'detail': '登录失败，' + STATUS_CODE_DICT[login_status]
         }
 
-    result = s.sign_tasks_run()
+    result = auto_sign.sign_tasks_run()
     detail = result['detail']
-    if result['msg'] == 2001:
-        if SERVER_CHAN['status']:
-            server_chan_send(detail)
+    # if result['msg'] == 2001:
+    #     if SERVER_CHAN['status']:
+    #         server_chan_send(detail)
     return detail
 
 
 def local_run():
     print("="*50)
     print("[{}]".format(time.strftime('%Y-%m-%d %H:%M:%S')))
-    print(
-        "签到状态: ",
-        gen_run()
-    )
+    for info in USER_INFOS:
+        print(
+            "签到状态: ",
+            gen_run(info['username'], info['password'])
+        )
 
 
 if __name__ == '__main__':

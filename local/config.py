@@ -1,11 +1,13 @@
 # =================配置区start===================
 
-# 学习通账号密码
-USER_INFO = {
-    'username': 'xxxx',
-    'password': 'xxxx',
-    'schoolid': ''  # 学号登录才需要填写
-}
+# 学习通账号密码,可添加多个账号
+USER_INFOS = [
+    {
+        'username': 'xxxx',
+        'password': 'xxxx',
+        'schoolid': ''  # 学号登录才需要填写
+    },
+]
 
 # 签到间隔时间设置,时分秒, 默认是每间隔5分钟执行一次
 i_hours = 0
