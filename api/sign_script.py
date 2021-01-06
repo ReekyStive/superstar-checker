@@ -42,9 +42,19 @@ class Sign(object):
                 'status': 3001
             }
 
-    async def qcode_sign(self):
-        """二维码签到"""
+    async def qcode_sign(self, *, enc: str):
+        """
+        二维码签到
+        @params enc: 校验码
+        """
+        if not enc:
+            return {
+                'date': time.strftime("%m-%d %H:%M", time.localtime()),
+                'status': 4001
+            }
+
         params = {
+            'enc': enc,
             'name': '',
             'activeId': self.activeid,
             'uid': '',
@@ -55,7 +65,15 @@ class Sign(object):
             'fid': '',
             'appType': '15'
         }
-        async with self.session.get('https://mobilelearn.chaoxing.com/pptSign/stuSignajax', params=params):
+
+        async with self.session.get('https://mobilelearn.chaoxing.com/pptSign/stuSignajax', params=params, allow_redirects=False) as resp:
+            text = await resp.read()
+            if "失败" in text.decode():
+                return {
+                    'date': time.strftime("%m-%d %H:%M", time.localtime()),
+                    'status': 4002
+                }
+
             return {
                 'date': time.strftime("%m-%d %H:%M", time.localtime()),
                 'status': 3004

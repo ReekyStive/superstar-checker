@@ -22,24 +22,27 @@ class User(BaseModel):
 async def sign(username: str,
                password: str,
                schoolid: Optional[str] = None,
-               sckey: Optional[str] = None) -> dict:
+               sckey: Optional[str] = None,
+               enc: Optional[str] = None) -> dict:
     """
-    签到
-    @param username:
-    @param password:
-    @param schoolid:
-    @param sckey:
+    签到接口\n
+    @param username: 手机号 邮箱 学号\n
+    @param password: 密码\n
+    @param schoolid: 学校id[仅学号登录填写]\n
+    @param sckey: 废弃\n
+    @param enc: 二维码扫码签到校验码\n
     @return:
     """
-    semaphore = asyncio.Semaphore(20)
+    # semaphore = asyncio.Semaphore(20)
 
-    async with semaphore:
-        async with ClientSession(headers=HEADERS, connector=TCPConnector(limit=2)) as session:
-            return await cloud_sign.run(session=session,
-                                        username=username,
-                                        password=password,
-                                        schoolId=schoolid,
-                                        sckey=sckey)
+    # async with semaphore:
+    async with ClientSession(headers=HEADERS) as session:
+        return await cloud_sign.run(session=session,
+                                    username=username,
+                                    password=password,
+                                    schoolId=schoolid,
+                                    sckey=sckey,
+                                    enc=enc)
 
 
 @app.get('/updatecourseid')
@@ -49,11 +52,11 @@ async def update_courseid(username: str,
                           schoolid: Optional[str] = None,
                           sckey: Optional[str] = None) -> dict:
     """
-    更新课程ID
-    @param username:
-    @param password:
-    @param schoolid:
-    @param sckey:
+    更新课程ID\n
+    @param username: 手机号 邮箱 学号\n
+    @param password: 密码\n
+    @param schoolid: 学校id[仅学号登录填写]\n
+    @param sckey: 废弃\n
     @return:
     """
     async with ClientSession(headers=HEADERS) as session:
@@ -63,33 +66,6 @@ async def update_courseid(username: str,
                                     schoolId=schoolid,
                                     sckey=sckey,
                                     task_type='update')
-
-
-# @app.post('/sign')
-# async def sign(user: User) -> dict:
-#     """
-#     签到
-#     @param user:
-#     @return:
-#     """
-#     return await cloud_sign.run(username=user.username,
-#                                 password=user.password,
-#                                 schoolId=user.schoolid,
-#                                 sckey=user.sckey)
-#
-#
-# @app.post('/updatecourseid')
-# async def update_courseid(user: User) -> dict:
-#     """
-#     更新课程ID
-#     @param user:
-#     @return:
-#     """
-#     return await cloud_sign.run(username=user.username,
-#                                 password=user.password,
-#                                 schoolId=user.schoolid,
-#                                 sckey=user.sckey,
-#                                 task_type='update')
 
 
 if __name__ == "__main__":

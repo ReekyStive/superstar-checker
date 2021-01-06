@@ -22,17 +22,26 @@ HEADERS = {
 
 class AutoSign(object):
 
-    def __init__(self, session: ClientSession, username: str, password: str, schoolid: str = None):
+    def __init__(self, session: ClientSession, proxy: str = None, username: str = None, password: str = None,
+                 schoolid: str = None,
+                 enc: str = None):
         """初始化就进行登录
         @param session:
+        @param proxy: 代理
         @param username: 用户[学号]
         @param password: 密码
         @param schoolid: 学校ID[仅学号登录填写]
+        @param enc: 用于扫码签到的校验码
         """
-        self.session = session
+        if username is None or password is None:
+            return
+
         self.username = username
         self.password = password
+        self.session = session
+        self.proxy = proxy
         self.schoolid = schoolid
+        self.enc = enc
         self.mongo = SignMongoDB(username)
 
     async def is_new_user(self) -> None:
@@ -59,7 +68,10 @@ class AutoSign(object):
 
     async def save_cookies(self, cookies: dict):
         """保存cookies"""
-        await self.mongo.save_cookie(cookies)
+        cookie = {}
+        for key, morsel in cookies.items():
+            cookie[key] = morsel.value
+        await self.mongo.save_cookie(cookie)
 
     async def check_cookies(self) -> bool:
         """
@@ -76,11 +88,14 @@ class AutoSign(object):
         self.session.cookie_jar.update_cookies(cookies)
 
         # 验证cookies
-        async with self.session.get('http://mooc1-1.chaoxing.com', allow_redirects=False) as resp:
-            if resp.status != 200:
-                # print("cookies有效")
+        async with self.session.get('http://i.mooc.chaoxing.com/space/') as resp:
+            soup = BeautifulSoup(await resp.text("utf-8", "ignore"), 'html.parser')
+            title = soup.title.string
+            if title == '用户登录':
+                print('cookies已失效')
+            else:
+                print('cookies有效')
                 status = True
-            # print("cookies已失效")
 
         return status
 
@@ -91,7 +106,7 @@ class AutoSign(object):
                                                                                                     self.schoolid if self.schoolid else "")
         code: int
         cookies: dict = {}
-        async with self.session.get(url) as resp:
+        async with self.session.get(url, proxy=self.proxy) as resp:
             if resp.status == 403:
                 code = 1002
                 return {
@@ -121,10 +136,7 @@ class AutoSign(object):
         @return:
         """
         activeid_lists: list = await self.mongo.get_text_activeid()
-        if activeid in activeid_lists:
-            return True
-        else:
-            return False
+        return True if activeid in activeid_lists else False
 
     @staticmethod
     def class_info(res: List[Dict], soup: BeautifulSoup) -> List[Dict]:
@@ -151,18 +163,19 @@ class AutoSign(object):
 
     async def get_all_classid(self) -> List[Dict]:
         """
-        获取课程主页中所有课程的classid和courseid
+        获取用户所有课程的classid和courseid
         """
         res: List[Dict] = await self.mongo.get_all_classid_and_courseid()
-        # 之前的存储为List[List]
+
+        # 老版本存储为List[List]
         if res and isinstance(res[0], list):
-            # 将之前的存储格式更新为List[Dict]
+            # 将老版本存储格式更新为List[Dict]
             await self.update_courseid()
             res: List[Dict] = await self.mongo.get_all_classid_and_courseid()
 
         # 数据库查找，没有则新获取
         if not res:
-            async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction') as resp:
+            async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction', proxy=self.proxy) as resp:
                 soup = BeautifulSoup(await resp.read(), "lxml")
 
             res = self.class_info(res, soup)
@@ -175,7 +188,7 @@ class AutoSign(object):
         @return:
         """
         res: List[Dict] = []
-        async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction') as resp:
+        async with self.session.get('http://mooc1-2.chaoxing.com/visit/interaction', proxy=self.proxy) as resp:
             soup = BeautifulSoup(await resp.read(), "lxml")
 
         res = self.class_info(res, soup)
@@ -191,21 +204,21 @@ class AutoSign(object):
         """
         sign_url = 'https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/preSign?activeId={}&classId={}&courseId={}'.format(
             activeid, classid, courseid)
-        async with self.session.get(sign_url) as resp:
+        async with self.session.get(sign_url, proxy=self.proxy) as resp:
             h = etree.HTML(await resp.read())
         sign_type: list = h.xpath('//div[@class="location"]/span/text()')
         return sign_type[0]
 
     async def get_activeid(self, classid: str, courseid: str, classname: str) -> Optional[Dict]:
         """
-        访问任务面板获取课程的活动id
+        获取课程的活动id
         """
 
         res: list = []
         re_rule = r'([\d]+),2'
         url: str = 'https://mobilelearn.chaoxing.com/widget/pcpick/stu/index?courseId={}&jclassId={}'.format(
             courseid, classid)
-        async with self.session.get(url) as resp:
+        async with self.session.get(url, proxy=self.proxy) as resp:
             h = etree.HTML(await resp.read())
 
         activeid_list = h.xpath('//*[@id="startList"]/div/div/@onclick')
@@ -245,7 +258,7 @@ class AutoSign(object):
             res = await sign.hand_sign()
 
         elif "二维码" in sign_type:
-            res = await sign.qcode_sign()
+            res = await sign.qcode_sign(enc=self.enc)
 
         elif "位置" in sign_type:
             res = await sign.addr_sign()
@@ -259,12 +272,15 @@ class AutoSign(object):
         return res
 
     async def sign_tasks_run(self) -> dict:
-        """开始所有签到任务"""
+        """
+        开始签到任务
+        """
         tasks: list = []
         message: str = ''
+        # 已签到列表
         signed_list: List[Dict] = []
 
-        # 获取所有课程的classid和course_id
+        # 获取用户所有课程的classid和course_id
         class_infos: List[Dict] = await self.get_all_classid()
 
         # 使用协程获取所有课程activeid和签到类型
@@ -274,7 +290,7 @@ class AutoSign(object):
                                           classname=info['classname'])
             tasks.append(coroutine)
 
-        result: List[Optional[Dict]] = await asyncio.gather(*tasks)
+        result = await asyncio.gather(*tasks)
         # print('执行结果->', result)
         for r in result:
             if not r:
@@ -292,15 +308,18 @@ class AutoSign(object):
                     'date': sign_res['date'],
                     'status': STATUS_CODE_DICT[sign_res['status']]
                 }
-                # 将签到成功activeid保存至数据库
-                await self.mongo.save_text_activeid(d['activeid'])
+
+                if str(sign_res['status']).startswith("30"):
+                    # 将签到成功activeid保存至数据库
+                    await self.mongo.save_text_activeid(d['activeid'])
                 signed_list.append(sign_msg)
+
         if signed_list:
             code = 2001
-            # message: str = ''
         else:
             code = 2000
             message = STATUS_CODE_DICT[2000]
+
         return {
             'code': code,
             'signed_list': signed_list,
@@ -330,6 +349,7 @@ async def run(
         username: str,
         password: str,
         schoolId: Optional[str] = None,
+        enc: str = "",
         sckey: Optional[str] = None,
         task_type: Optional[str] = 'sign'
 ) -> dict:
@@ -339,13 +359,25 @@ async def run(
     @param username:
     @param password:
     @param schoolId:
+    @param enc:
     @param sckey:
     @param task_type: 任务类型： sign签到; update更新
     @return:
     """
     result: dict = {}
     try:
-        auto_sign = AutoSign(session, username, password, schoolId)
+        # proxy = await get_proxy()
+        # ip_port = proxy['proxy']
+        # proxy = "http://62.171.177.113:8888"
+        # proxy = "http://dtip123456:dtip123456@60.167.22.112:888"
+        auto_sign = AutoSign(
+            session=session,
+            # proxy=proxy,
+            username=username,
+            password=password,
+            schoolid=schoolId,
+            enc=enc
+        )
         await auto_sign.is_new_user()
         login_status = await auto_sign.set_cookies()
 
@@ -354,6 +386,7 @@ async def run(
                 'msg': login_status,
                 'message': '登录失败，' + STATUS_CODE_DICT[login_status]
             }
+
         if task_type == 'sign':
             result = await auto_sign.sign_tasks_run()
         elif task_type == 'update':

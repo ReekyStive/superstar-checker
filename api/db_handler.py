@@ -86,10 +86,11 @@ class SignMongoDB(object):
         """
         sort = [(u"_id", -1)]
         res = await self.collection.find_one({"username": self.username}, {"activeid": 1.0}, sort=sort, limit=10)
-        try:
-            return res["activeid"]
-        except:
-            return []
+        return res.get("activeid", [])
+        # try:
+        #     return res["activeid"]
+        # except:
+        #     return []
 
     async def set_test_data(self):
         await self.collection.insert_one(
