@@ -62,14 +62,17 @@ class HeathReport(object):
             "enc": "f837c93e0de9d9ad82db707b2c27241e",
             "formAppId": ""
         }
-        api = 'http://office.chaoxing.com/data/web/apps/forms/fore/user/list'
+        # api = 'http://office.chaoxing.com/data/web/apps/forms/fore/user/list'
+        api = 'http://office.chaoxing.com/data/apps/forms/fore/forms/user/last/info'
         resp = self._session.get(api, params=params)
         raw_data = json.loads(resp.text)
+        if not raw_data['data']:
+            raise Exception('获取上次提交数据为空，可能为今日已提交')
         return raw_data
 
     @staticmethod
     def clean_heath_info(raw_data: dict) -> list:
-        form_data = raw_data['data']['formUserList'][0]['formData']
+        form_data = raw_data['data']['formsUser']['formData']
         d = {
             "inDetailGroupIndex": -1,
             "fromDetail": False,
@@ -126,9 +129,9 @@ class HeathReport(object):
         """
         上报今日信息
         """
-        # save_api = "http://office.chaoxing.com/data/apps/forms/fore/user/save?lookuid=127973522"
         save_api = "http://office.chaoxing.com/data/apps/forms/fore/user/save?lookuid=127973604"
         params = {
+            "gatherId": "0",
             "formId": "7185",
             "formAppId": "",
             "version": "2",
@@ -146,7 +149,10 @@ class HeathReport(object):
         @return:
         @rtype:
         """
-        form_url = "http://office.chaoxing.com/front/web/apps/forms/fore/apply?uid=127973604&code=l5RJsW2w&mappId=4545821&appId=1e354ddb52a743e88ed19a3704b1cf1a&appKey=127G2jhIhl05mw3S&id=7185&enc=f837c93e0de9d9ad82db707b2c27241e&state=39037&formAppId=&fidEnc=b06cba4a51ac2253"
+        form_url = "http://office.chaoxing.com/front/web/apps/forms/fore/apply" \
+                   "?uid=127973604&code=l5RJsW2w&mappId=4545821&appId=1e354ddb52a743e88ed19a3704b1cf1a" \
+                   "&appKey=127G2jhIhl05mw3S&id=7185&enc=f837c93e0de9d9ad82db707b2c27241e&state=39037" \
+                   "&formAppId=&fidEnc=b06cba4a51ac2253"
         return self._session.get(url=form_url)
 
     @staticmethod
