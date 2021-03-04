@@ -2,6 +2,18 @@
 
 这是一个从 [mkdir700/chaoxing_auto_sign](https://github.com/mkdir700/chaoxing_auto_sign) Fork 过来的经过修改版本。此版本阉割了 API 和健康打卡，仅保留了本地版本。
 
+## 如果你不想折腾
+
+这里有为 Windows 打包好的版本，开箱即用。
+
+[checker-win.7z](https://github.com/ReekyStive/superstar-checker/releases/download/v1.0/checker-win.7z)
+
+其中包含
+
+- 本项目源代码
+- Python 解释器
+- 依赖包
+
 ## 功能描述
 
 - 登录方式
