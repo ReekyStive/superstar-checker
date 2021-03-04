@@ -1,7 +1,7 @@
 # ================= 配置区 start ===================
 
 # 学习通账号密码, 可添加多个账号
-USER_INFOS = [
+user_infos = [
     {
         'username': 'xxxx',
         'password': 'xxxx',
@@ -9,28 +9,37 @@ USER_INFOS = [
     }
 ]
 
-# 签到间隔时间设置, 时分秒, 默认是每间隔 5 分钟执行一次
-i_hours = 0
-i_minutes = 5
-i_seconds = 0
+# fixed_interval: 是否使用固定时间间隔
+# 为 True 则使用 exec_interval 中的配置, 为 False 则使用 exec_times 中的配置
+# 为 True 则每隔固定时间执行一次, 默认 5 分钟, 为 False 则在固定时间点执行
+fixed_interval = False
+exec_interval = [
+    {'hour': 0, 'minute': 5, 'second': 0}
+]
+exec_times = [
+    {'hour': 7, 'minute': 40, 'second': 0},
+    {'hour': 7, 'minute': 50, 'second': 0},
+    {'hour': 8, 'minute': 0, 'second': 0},
+    {'hour': 8, 'minute': 10, 'second': 0}
+]
 
 # server 酱
-SERVER_CHAN_SCKEY = 'xxxx'  # 申请地址 http://sc.ftqq.com/3.version
-SERVER_CHAN = {
+server_chan_sckey = 'xxxx'  # 申请地址 http://sc.ftqq.com/3.version
+server_chan = {
     'status': True,  # 如果关闭 server 酱功能，请改为 False
-    'url': 'https://sc.ftqq.com/{}.send'.format(SERVER_CHAN_SCKEY)
+    'url': 'https://sc.ftqq.com/{}.send'.format(server_chan_sckey)
 }
 
 # 学习通账号 cookies 缓存文件路径
-COOKIES_PATH = "./"
-COOKIES_FILE_PATH = COOKIES_PATH + "cookies.json"
+cookies_path = "./"
+cookies_file_path = cookies_path + "cookies.json"
 
 # activeid 保存文件路径
-ACTIVEID_PATH = "./"
-ACTIVEID_FILE_PATH = ACTIVEID_PATH + "activeid.json"
+activeid_path = "./"
+activeid_file_path = activeid_path + "activeid.json"
 
 # 拍照签到的图片文件
-IMAGE_PATH = "./image/"
+image_path = "./image/"
 
 # 位置信息
 latitude = "-2"
@@ -40,7 +49,7 @@ longitude = "-1"
 clientip = "0.0.0.0"
 
 # 状态码
-STATUS_CODE_DICT = {
+status_code_dict = {
     1000: '登录成功',
     1001: '登录信息有误',
     1002: '拒绝访问',

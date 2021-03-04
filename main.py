@@ -43,19 +43,19 @@ class AutoSign(object):
     def save_cookies(self):
         """保存 cookies"""
         new_cookies = self.session.cookies.get_dict()
-        with open(COOKIES_FILE_PATH, "r") as f:
+        with open(cookies_file_path, "r") as f:
             data = json.load(f)
             data[self.username] = new_cookies
-            with open(COOKIES_FILE_PATH, 'w') as f2:
+            with open(cookies_file_path, 'w') as f2:
                 json.dump(data, f2)
 
     def check_cookies(self):
         """检测 json 文件内是否存有 cookies, 有则检测, 无则登录"""
-        if "cookies.json" not in os.listdir(COOKIES_PATH):
-            with open(COOKIES_FILE_PATH, 'w+') as f:
+        if "cookies.json" not in os.listdir(cookies_path):
+            with open(cookies_file_path, 'w+') as f:
                 f.write("{}")
 
-        with open(COOKIES_FILE_PATH, 'r') as f:
+        with open(cookies_file_path, 'r') as f:
             # json 文件有无账号 cookies, 没有, 则直接返回 False
             try:
                 data = json.load(f)
@@ -98,11 +98,11 @@ class AutoSign(object):
     def check_activeid(self, activeid):
         """检测activeid是否存在，不存在则添加"""
         activeid += self.username
-        if "activeid.json" not in os.listdir(ACTIVEID_PATH):
-            with open(ACTIVEID_FILE_PATH, 'w+') as f:
+        if "activeid.json" not in os.listdir(activeid_path):
+            with open(activeid_file_path, 'w+') as f:
                 f.write("{}")
 
-        with open(ACTIVEID_FILE_PATH, 'r') as f:
+        with open(activeid_file_path, 'r') as f:
             try:
                 # 读取文件
                 data = json.load(f)
@@ -115,12 +115,12 @@ class AutoSign(object):
     def save_activeid(self, activeid):
         """保存已成功签到的 activeid"""
         activeid += self.username
-        if "activeid.json" not in os.listdir(ACTIVEID_PATH):
-            with open(ACTIVEID_FILE_PATH, 'w+') as f:
+        if "activeid.json" not in os.listdir(activeid_path):
+            with open(activeid_file_path, 'w+') as f:
                 f.write("{}")
-        with open(ACTIVEID_FILE_PATH, 'r') as f:
+        with open(activeid_file_path, 'r') as f:
             data = json.load(f)
-            with open(ACTIVEID_FILE_PATH, 'w') as f2:
+            with open(activeid_file_path, 'w') as f2:
                 data[activeid] = True
                 json.dump(data, f2)
 
@@ -290,15 +290,15 @@ class AutoSign(object):
         """上传图片"""
         # 从图片文件夹内随机选择一张图片
         try:
-            all_img = os.listdir(IMAGE_PATH)
+            all_img = os.listdir(image_path)
         except Exception as e:
-            os.mkdir(IMAGE_PATH)
+            os.mkdir(image_path)
             all_img = 0
 
         if len(all_img) == 0:
             return "a5d588f7bce1994323c348982332e470"
         else:
-            img = IMAGE_PATH + random.choice(all_img)
+            img = image_path + random.choice(all_img)
             uid = self.session.cookies.get_dict()['UID']
             url = 'https://pan-yz.chaoxing.com/upload'
             files = {'file': (img, open(img, 'rb'),
@@ -370,7 +370,7 @@ class AutoSign(object):
         else:
             final_msg = {
                 'msg': 2000,
-                'detail': STATUS_CODE_DICT[2000]
+                'detail': status_code_dict[2000]
             }
         return final_msg
 
@@ -387,7 +387,7 @@ def server_chan_send(msgs):
         'text': '您的网课签到消息来啦',
         'desp': desp
     }
-    requests.get(SERVER_CHAN['url'], params=params)
+    requests.get(server_chan['url'], params=params)
 
 
 @log_error_msg
@@ -398,21 +398,21 @@ def gen_run(username, password):
     if login_status != 1000:
         return {
             'msg': login_status,
-            'detail': '登录失败, ' + STATUS_CODE_DICT[login_status]
+            'detail': '登录失败, ' + status_code_dict[login_status]
         }
 
     result = auto_sign.sign_tasks_run()
     detail = result['detail']
-    # if result['msg'] == 2001:
-    #     if SERVER_CHAN['status']:
-    #         server_chan_send(detail)
+    if result['msg'] == 2001:
+        if server_chan['status']:
+            server_chan_send(detail)
     return detail
 
 
-def local_run():
+def run():
     print("="*50)
     print("[{}]".format(time.strftime('%Y-%m-%d %H:%M:%S')))
-    for info in USER_INFOS:
+    for info in user_infos:
         print(
             "签到状态: ",
             gen_run(info['username'], info['password'])
@@ -421,8 +421,14 @@ def local_run():
 
 if __name__ == '__main__':
     scheduler = BlockingScheduler()
-    scheduler.add_job(local_run, 'interval', hours=i_hours,
-                      minutes=i_minutes, seconds=i_seconds)
-    print('已开启定时执行, 每间隔 [ {} 时 {} 分 {} 秒] 执行一次签到任务'.format(
-        i_hours, i_minutes, i_seconds))
+    if fixed_interval:
+        scheduler.add_job(run, 'interval', hours=exec_interval['hour'],
+                          minutes=exec_interval['minute'], seconds=exec_interval['second'])
+        print('已开启定时执行, 每间隔 [ {} 时 {} 分 {} 秒] 执行一次签到任务'.format(
+              exec_interval['hour'], exec_interval['minute'], exec_interval['second']))
+    else:
+        for item in exec_times:
+            scheduler.add_job(run, 'cron', hours=item['hour'],
+                              minutes=item['minute'], seconds=item['second'])
+        print('已开启定时执行, 将在指定的时间点执行签到任务')
     scheduler.start()
