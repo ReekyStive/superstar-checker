@@ -30,7 +30,7 @@
 ├── log.py
 ├── main.py            # 主程序
 ├── readme.md
-└── requirements.tx
+└── requirements.txt
 ```
 
 ## 使用方法
