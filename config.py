@@ -12,7 +12,7 @@ user_infos = [
 # fixed_interval: 是否使用固定时间间隔
 # 为 True 则使用 exec_interval 中的配置, 为 False 则使用 exec_times 中的配置
 # 为 True 则每隔固定时间执行一次, 默认 5 分钟, 为 False 则在固定时间点执行
-fixed_interval = False
+fixed_interval = True
 exec_interval = [
     {'hour': 0, 'minute': 5, 'second': 0}
 ]
@@ -26,7 +26,7 @@ exec_times = [
 # server 酱
 server_chan_sckey = 'xxxx'  # 申请地址 http://sc.ftqq.com/3.version
 server_chan = {
-    'status': True,  # 如果关闭 server 酱功能，请改为 False
+    'status': False,  # 如果关闭 server 酱功能，请改为 False
     'url': 'https://sc.ftqq.com/{}.send'.format(server_chan_sckey)
 }
 

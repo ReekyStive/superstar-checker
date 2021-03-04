@@ -428,7 +428,7 @@ if __name__ == '__main__':
               exec_interval['hour'], exec_interval['minute'], exec_interval['second']))
     else:
         for item in exec_times:
-            scheduler.add_job(run, 'cron', hours=item['hour'],
-                              minutes=item['minute'], seconds=item['second'])
+            scheduler.add_job(run, 'cron', hour=item['hour'],
+                              minute=item['minute'], second=item['second'])
         print('已开启定时执行, 将在指定的时间点执行签到任务')
     scheduler.start()
