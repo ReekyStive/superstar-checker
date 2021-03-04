@@ -1,7 +1,0 @@
-lxml
-BeautifulSoup4
-uvicorn
-fastapi
-mongo
-motor
-aiohttp
