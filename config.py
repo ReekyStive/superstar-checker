@@ -1,31 +1,31 @@
-# =================配置区start===================
+# ================= 配置区 start ===================
 
-# 学习通账号密码,可添加多个账号
+# 学习通账号密码, 可添加多个账号
 USER_INFOS = [
     {
         'username': 'xxxx',
         'password': 'xxxx',
         'schoolid': ''  # 学号登录才需要填写
-    },
+    }
 ]
 
-# 签到间隔时间设置,时分秒, 默认是每间隔5分钟执行一次
+# 签到间隔时间设置, 时分秒, 默认是每间隔 5 分钟执行一次
 i_hours = 0
 i_minutes = 5
 i_seconds = 0
 
-# server酱
-SERVER_CHAN_SCKEY = 'xxxx'  # 申请地址http://sc.ftqq.com/3.version
+# server 酱
+SERVER_CHAN_SCKEY = 'xxxx'  # 申请地址 http://sc.ftqq.com/3.version
 SERVER_CHAN = {
-    'status': True,  # 如果关闭server酱功能，请改为False
+    'status': True,  # 如果关闭 server 酱功能，请改为 False
     'url': 'https://sc.ftqq.com/{}.send'.format(SERVER_CHAN_SCKEY)
 }
 
-# 学习通账号cookies缓存文件路径
+# 学习通账号 cookies 缓存文件路径
 COOKIES_PATH = "./"
 COOKIES_FILE_PATH = COOKIES_PATH + "cookies.json"
 
-# activeid保存文件路径
+# activeid 保存文件路径
 ACTIVEID_PATH = "./"
 ACTIVEID_FILE_PATH = ACTIVEID_PATH + "activeid.json"
 
@@ -36,7 +36,7 @@ IMAGE_PATH = "./image/"
 latitude = "-2"
 longitude = "-1"
 
-# ip地址
+# ip 地址
 clientip = "0.0.0.0"
 
 # 状态码
@@ -48,4 +48,4 @@ STATUS_CODE_DICT = {
     2001: '有任务且签到成功',
     4000: '未知错误'
 }
-# =================配置区end===================
+# ================= 配置区 end ===================

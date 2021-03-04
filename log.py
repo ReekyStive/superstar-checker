@@ -14,6 +14,5 @@ def log_error_msg(func):
             return func(*arg, **kwargs)
         except Exception as e:
             logger.exception(e)
-            return '程序执行出错,错误信息已在记录日志'
+            return '程序执行出错, 错误信息已在记录日志'
     return warp
-
