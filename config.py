@@ -13,9 +13,9 @@ user_infos = [
 # 为 True 则使用 exec_interval 中的配置, 为 False 则使用 exec_times 中的配置
 # 为 True 则每隔固定时间执行一次, 默认 5 分钟, 为 False 则在固定时间点执行
 fixed_interval = True
-exec_interval = [
-    {'hour': 0, 'minute': 5, 'second': 0}
-]
+exec_interval = {
+    'hour': 0, 'minute': 5, 'second': 0
+}
 exec_times = [
     {'hour': 7, 'minute': 40, 'second': 0},
     {'hour': 7, 'minute': 50, 'second': 0},
