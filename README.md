@@ -6,7 +6,7 @@
 
 这里有为 Windows 打包好的版本，开箱即用。
 
-[checker-win.7z](https://github.com/ReekyStive/superstar-checker/releases/download/v1.0/checker-win.7z)
+[checker-win.7z](https://github.com/ReekyStive/superstar-checker/releases/download/v1.1/checker-win.7z)
 
 其中包含
 
