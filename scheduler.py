@@ -1,17 +1,19 @@
 from config import *
 import checker
-from apscheduler.schedulers.blocking import BlockingScheduler
+import schedule
+from time import sleep
 
 if __name__ == '__main__':
-    scheduler = BlockingScheduler()
     if fixed_interval:
-        scheduler.add_job(checker.run, 'interval', hours=exec_interval['hour'],
-                          minutes=exec_interval['minute'], seconds=exec_interval['second'])
+        seconds = exec_interval['hour'] * 3600 + \
+            exec_interval['minute'] * 60 + exec_interval['second']
+        schedule.every(seconds).seconds.do(checker.run)
         print('已开启定时执行, 每间隔 [ {} 时 {} 分 {} 秒] 执行一次签到任务'.format(
               exec_interval['hour'], exec_interval['minute'], exec_interval['second']))
     else:
         for item in exec_times:
-            scheduler.add_job(checker.run, 'cron', hour=item['hour'],
-                              minute=item['minute'], second=item['second'])
+            schedule.every().day.at(item).do(checker.run)
         print('已开启定时执行, 将在指定的时间点执行签到任务')
-    scheduler.start()
+    while True:
+        schedule.run_pending()
+        sleep(1)

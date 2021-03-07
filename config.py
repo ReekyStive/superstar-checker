@@ -17,10 +17,9 @@ exec_interval = {
     'hour': 0, 'minute': 5, 'second': 0
 }
 exec_times = [
-    {'hour': 7, 'minute': 40, 'second': 0},
-    {'hour': 7, 'minute': 50, 'second': 0},
-    {'hour': 8, 'minute': 0, 'second': 0},
-    {'hour': 8, 'minute': 10, 'second': 0}
+    '08:00',
+    '08:10',
+    '18:00'
 ]
 
 # server 酱

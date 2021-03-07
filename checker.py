@@ -9,6 +9,7 @@ import random
 import requests
 from lxml import etree
 from bs4 import BeautifulSoup
+
 requests.packages.urllib3.disable_warnings()
 
 
